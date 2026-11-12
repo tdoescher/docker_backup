@@ -6,16 +6,12 @@ if [ -f /etc/backup.env ]; then
   . /etc/backup.env
 fi
 
-PREFIX="${PREFIX:-}"
+PROJECT="${PROJECT:-}"
+SERVICES="${STOP_SERVICES:-}}"
 
 EXCL=""
 for p in ${EXCLUDES:-}; do
   EXCL="$EXCL --exclude=$p"
-done
-
-CONTAINERS=""
-for c in ${STOP_CONTAINERS:-}; do
-  CONTAINERS="$CONTAINERS ${PREFIX:+$PREFIX-}$c"
 done
 
 log() {
@@ -29,8 +25,9 @@ push() {
 }
 finish() {
   rc=$?
-  if [ -n "$CONTAINERS" ]; then
-    if ! docker start $CONTAINERS; then
+  if [ -n "$SERVICES" ]; then
+    log "Starting services:$SERVICES"
+    if ! docker compose -p "$PROJECT" start $SERVICES; then
       rc=1
     fi
   fi
@@ -41,16 +38,22 @@ finish() {
   fi
 }
 
+if [ -n "$SERVICES" ] && [ -z "$PROJECT" ]; then
+  log "PROJECT required to stop services"
+  exit 1
+fi
+
 trap finish EXIT
 trap 'exit 1' HUP INT TERM
 
-if [ -n "$CONTAINERS" ]; then
-  docker stop $CONTAINERS
+if [ -n "$SERVICES" ]; then
+  log "Stopping services:$SERVICES"
+  docker compose -p "$PROJECT" stop $SERVICES
 fi
 
 for dir in /volumes/*/; do
   name=$(basename "$dir")
-  file="/backup/${PREFIX:+${PREFIX}_}$name.tgz"
+  file="/backup/${PROJECT:+${PROJECT}_}$name.tgz"
   log "Backing up $name"
   tar czf "$file" $EXCL -C "$dir" .
   if [ -n "${BACKUP_OWNER:-}" ]; then
