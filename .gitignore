@@ -1,0 +1,10 @@
+# dotenv
+.env
+
+# macOS
+.idea
+.nova
+.vscode
+.DS_Store*
+Icon^M
+._*
